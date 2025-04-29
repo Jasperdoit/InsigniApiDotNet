@@ -1,0 +1,6 @@
+services:
+  insigniapi:
+    image: ${DOCKER_REGISTRY-}insigniapi
+    build:
+      context: .
+      dockerfile: InsigniApi/Dockerfile

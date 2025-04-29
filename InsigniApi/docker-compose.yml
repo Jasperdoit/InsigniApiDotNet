@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  insigniapi-postgres:
+    image: postgres:latest
+    container_name: insigniapi-postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=Insignia
+    ports:
+      - "5432:5432"
+    volumes:
+      - insigniapi-postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+volumes:
+  insigniapi-postgres-data:
