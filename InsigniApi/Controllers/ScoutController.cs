@@ -115,6 +115,8 @@ namespace InsigniApi.Controllers
             return NoContent();
         }
 
+        // Todo: Make Leader Signature and Timestamp show up in GetDto
+
         [HttpPost("assignment")]
         public IActionResult AddAssignmentToScout(AddAssignmentToScoutDto dto)
         {
@@ -182,6 +184,72 @@ namespace InsigniApi.Controllers
             return NoContent();
         }
 
-        // Todo: Add a method to remove an assignment from a scout, in case of mistakes and such. How should this affect the insignia?
+        [HttpDelete("assignment")]
+        public IActionResult RemoveAssignmentFromScout(RemoveAssignmentFromScoutDto dto)
+        {
+            var scout = applicationDbContext.Scouts
+                .Include(s => s.CompletedAssignments)
+                .FirstOrDefault(s => s.Id == dto.ScoutId);
+
+            if (scout is null)
+            {
+                return NotFound("Scout not found");
+            }
+
+            var assignment = applicationDbContext.Assignments
+                .Include(a => a.ScoutsWithAssignment)
+                .FirstOrDefault(a => a.Id == dto.AssignmentId);
+            if (assignment is null)
+            {
+                return NotFound("Assignment not found");
+            }
+
+            if (!scout.CompletedAssignments.Any(a => a.Id == dto.AssignmentId))
+            {
+                return BadRequest("Assignment not completed by this scout.");
+            }
+
+            // Remove the assignment from the scout
+            scout.CompletedAssignments.Remove(assignment);
+
+            // Remove the scout from the assignment
+            assignment.ScoutsWithAssignment.Remove(scout);
+
+            // Check if the scout had completed the insignia
+            var insignia = applicationDbContext.Insignias
+                .Include(i => i.Assignments)
+                .FirstOrDefault(i => i.ScoutsWithInsignia.Any(s => s.Id == scout.Id));
+            if (insignia != null)
+            {
+                // Check if the scout still has all the required assignments for the insignia
+                var requiredAssignmentsCount = insignia.RequiredAssignments;
+                if (requiredAssignmentsCount == 0)
+                {
+                    //List<Assignment> requiredAssignments = insignia.Assignments;
+                    //var allAssignmentsCompleted = requiredAssignments.All(a => scout.CompletedAssignments.Any(ca => ca.Id == a.Id));
+                    //if (!allAssignmentsCompleted)
+                    //{
+                    //    scout.CompletedInsignias.Remove(insignia);
+                    //}
+
+                    //Since all the assignments need to be completed and one assignment is removed, remove the insignia.
+                    scout.CompletedInsignias.Remove(insignia);
+                    insignia.ScoutsWithInsignia.Remove(scout);
+                }
+                else
+                {
+                    // Check if the scout still has enough assignments completed for the insignia
+                    var completedAssignmentsCount = scout.CompletedAssignments.Count(a => insignia.Assignments.Any(ia => ia.Id == a.Id));
+                    if (completedAssignmentsCount < requiredAssignmentsCount)
+                    {
+                        scout.CompletedInsignias.Remove(insignia);
+                        insignia.ScoutsWithInsignia.Remove(scout);
+                    }
+                }
+            }
+
+            applicationDbContext.SaveChanges();
+            return NoContent();
+        }
     }
 }
