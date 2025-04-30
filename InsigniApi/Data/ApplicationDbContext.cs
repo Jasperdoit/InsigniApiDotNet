@@ -21,6 +21,16 @@ namespace InsigniApi.Data
                 .HasForeignKey(s => s.ScoutGroupId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            modelBuilder.Entity<Scout>()
+                .HasMany(s => s.CompletedAssignments)
+                .WithMany(a => a.ScoutsWithAssignment)
+                .UsingEntity(j => j.ToTable("ScoutAssignments"));
+
+            modelBuilder.Entity<Scout>()
+                .HasMany(s => s.CompletedInsignias)
+                .WithMany(i => i.ScoutsWithInsignia)
+                .UsingEntity(j => j.ToTable("ScoutInsignias"));
+
             modelBuilder.Entity<Insignia>()
                 .HasMany(i => i.Assignments)
                 .WithOne(a => a.Insignia)

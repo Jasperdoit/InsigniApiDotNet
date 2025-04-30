@@ -114,5 +114,58 @@ namespace InsigniApi.Controllers
             applicationDbContext.SaveChanges();
             return NoContent();
         }
+
+        [HttpPost("assignment")]
+        public IActionResult AddAssignmentToScout(Guid scoutId, Guid assignmentId)
+        {
+            var scout = applicationDbContext.Scouts
+                .Include(s => s.CompletedAssignments)
+                .FirstOrDefault(s => s.Id == scoutId);
+            if (scout is null)
+            {
+                return NotFound();
+            }
+            var assignment = applicationDbContext.Assignments.Find(assignmentId);
+            if (assignment is null)
+            {
+                return NotFound();
+            }
+            if (scout.CompletedAssignments.Any(a => a.Id == assignmentId))
+            {
+                return BadRequest("Assignment already completed by this scout.");
+            }
+            scout.CompletedAssignments.Add(assignment);
+
+            var insignia = applicationDbContext.Insignias
+                .Include(i => i.Assignments)
+                .FirstOrDefault(i => i.Assignments.Any(a => a.Id == assignmentId));
+            if (insignia != null)
+            {
+                // Check the pre-requisite assignments for the insignia
+                var requiredAssignmentsCount = insignia.RequiredAssignments;
+
+                //If all assignments need to be completed.
+                if (requiredAssignmentsCount == 0)
+                {
+                    List<Assignment> requiredAssignments = insignia.Assignments;
+                    var allAssignmentsCompleted = requiredAssignments.All(a => scout.CompletedAssignments.Any(ca => ca.Id == a.Id));
+                    if (allAssignmentsCompleted)
+                    {
+                        scout.CompletedInsignias.Add(insignia);
+                    }
+                }
+                else
+                {
+                    //Grant insignia if the required number of assignments are completed.
+                    var completedAssignmentsCount = scout.CompletedAssignments.Count(a => insignia.Assignments.Any(ia => ia.Id == a.Id));
+                    if (completedAssignmentsCount >= requiredAssignmentsCount)
+                    {
+                        scout.CompletedInsignias.Add(insignia);
+                    }
+                }
+            }
+                applicationDbContext.SaveChanges();
+                return NoContent();
+        }
     }
 }
