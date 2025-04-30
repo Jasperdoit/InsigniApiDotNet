@@ -116,29 +116,43 @@ namespace InsigniApi.Controllers
         }
 
         [HttpPost("assignment")]
-        public IActionResult AddAssignmentToScout(Guid scoutId, Guid assignmentId)
+        public IActionResult AddAssignmentToScout(AddAssignmentToScoutDto dto)
         {
             var scout = applicationDbContext.Scouts
                 .Include(s => s.CompletedAssignments)
-                .FirstOrDefault(s => s.Id == scoutId);
+                .FirstOrDefault(s => s.Id == dto.ScoutId);
             if (scout is null)
             {
-                return NotFound();
+                return NotFound("Scout not found");
             }
-            var assignment = applicationDbContext.Assignments.Find(assignmentId);
+            var assignment = applicationDbContext.Assignments.Find(dto.AssignmentId);
             if (assignment is null)
             {
-                return NotFound();
+                return NotFound("Assignment not found");
             }
-            if (scout.CompletedAssignments.Any(a => a.Id == assignmentId))
+            if (scout.CompletedAssignments.Any(a => a.Id == dto.AssignmentId))
             {
                 return BadRequest("Assignment already completed by this scout.");
             }
+
+            // Use Entity Framework's entry and property methods to set the join table properties
             scout.CompletedAssignments.Add(assignment);
+            
+            // Get the entry for the relationship
+            var joinEntry = applicationDbContext.Entry(scout)
+                .Collection(s => s.CompletedAssignments)
+                .FindEntry(assignment);
+            
+            if (joinEntry != null)
+            {
+                // Set the join table properties
+                joinEntry.Property("LeaderSignature").CurrentValue = dto.LeaderSignature;
+                joinEntry.Property("CompletedDate").CurrentValue = DateTime.UtcNow;
+            }
 
             var insignia = applicationDbContext.Insignias
                 .Include(i => i.Assignments)
-                .FirstOrDefault(i => i.Assignments.Any(a => a.Id == assignmentId));
+                .FirstOrDefault(i => i.Assignments.Any(a => a.Id == dto.AssignmentId));
             if (insignia != null)
             {
                 // Check the pre-requisite assignments for the insignia
@@ -164,8 +178,10 @@ namespace InsigniApi.Controllers
                     }
                 }
             }
-                applicationDbContext.SaveChanges();
-                return NoContent();
+            applicationDbContext.SaveChanges();
+            return NoContent();
         }
+
+        // Todo: Add a method to remove an assignment from a scout, in case of mistakes and such. How should this affect the insignia?
     }
 }

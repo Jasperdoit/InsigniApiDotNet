@@ -24,7 +24,11 @@ namespace InsigniApi.Data
             modelBuilder.Entity<Scout>()
                 .HasMany(s => s.CompletedAssignments)
                 .WithMany(a => a.ScoutsWithAssignment)
-                .UsingEntity(j => j.ToTable("ScoutAssignments"));
+                .UsingEntity(j => {
+                    j.ToTable("ScoutAssignments");
+                    j.Property<DateTime>("CompletedDate");
+                    j.Property<String>("LeaderSignature");
+                });
 
             modelBuilder.Entity<Scout>()
                 .HasMany(s => s.CompletedInsignias)
