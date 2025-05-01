@@ -21,30 +21,39 @@ namespace InsigniApi.Data
                 .HasForeignKey(s => s.ScoutGroupId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            modelBuilder.Entity<Scout>()
-                .HasMany(s => s.CompletedAssignments)
+            modelBuilder.Entity<ScoutAssignment>()
+                .HasKey(sa => new { sa.ScoutId, sa.AssignmentId });
+
+            modelBuilder.Entity<ScoutAssignment>()
+                .HasOne(sa => sa.Scout)
+                .WithMany(s => s.CompletedAssignments)
+                .HasForeignKey(sa => sa.ScoutId);
+
+            modelBuilder.Entity<ScoutAssignment>()
+                .HasOne(sa => sa.Assignment)
                 .WithMany(a => a.ScoutsWithAssignment)
-                .UsingEntity(j => {
-                    j.ToTable("ScoutAssignments");
-                    j.Property<DateTime>("CompletedDate");
-                    j.Property<String>("LeaderSignature");
-                });
+                .HasForeignKey(sa => sa.AssignmentId);
 
-            modelBuilder.Entity<Scout>()
-                .HasMany(s => s.CompletedInsignias)
+            modelBuilder.Entity<ScoutInsignia>()
+                .HasKey(si => new { si.ScoutId, si.InsigniaId });
+
+            modelBuilder.Entity<ScoutInsignia>()
+                .HasOne(si => si.Scout)
+                .WithMany(s => s.CompletedInsignias)
+                .HasForeignKey(si => si.ScoutId);
+
+            modelBuilder.Entity<ScoutInsignia>()
+                .HasOne(si => si.Insignia)
                 .WithMany(i => i.ScoutsWithInsignia)
-                .UsingEntity(j => j.ToTable("ScoutInsignias"));
-
-            modelBuilder.Entity<Insignia>()
-                .HasMany(i => i.Assignments)
-                .WithOne(a => a.Insignia)
-                .HasForeignKey(a => a.InsigniaId)
-                .OnDelete(DeleteBehavior.Cascade);
+                .HasForeignKey(si => si.InsigniaId);
         }
 
         public DbSet<ScoutGroup> ScoutGroups { get; set; }
         public DbSet<Scout> Scouts { get; set; }
         public DbSet<Insignia> Insignias { get; set; }
         public DbSet<Assignment> Assignments { get; set; }
+
+        public DbSet<ScoutAssignment> ScoutAssignments { get; set; }
+        public DbSet<ScoutInsignia> ScoutInsignias { get; set; }
     }
 }

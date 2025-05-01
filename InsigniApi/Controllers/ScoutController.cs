@@ -1,4 +1,5 @@
 ﻿using InsigniApi.Data;
+using InsigniApi.Models.Dtos.Insignia;
 using InsigniApi.Models.Dtos.Scout;
 using InsigniApi.Models.Entities;
 using Microsoft.AspNetCore.Http;
@@ -18,23 +19,85 @@ namespace InsigniApi.Controllers
             this.applicationDbContext = applicationDbContext;
         }
 
-        private GetScoutDto GetScoutDto(Scout scout) => new GetScoutDto
+        private GetScoutDto GetScoutDto(Scout scout)
         {
-            Id = scout.Id,
-            Name = scout.Name,
-            Tenure = scout.Tennure,
-            ScoutGroupId = scout.ScoutGroupId.ToString(),
-            ScoutGroupName = scout.ScoutGroup != null ? scout.ScoutGroup.Name : "Unknown Group"
-        };
+            var completedInsignias = applicationDbContext.ScoutInsignias
+                .Include(si => si.Insignia)
+                .Where(si => si.ScoutId == scout.Id)
+                .Select(si => new GetScoutInsigniaDto
+                {
+                    Id = si.InsigniaId,
+                    Name = si.Insignia.Name,
+                    ImageUrl = si.Insignia.ImageUrl,
+                    RequiredAssignments = si.Insignia.RequiredAssignments,
+                    CompletedAssignments = applicationDbContext.ScoutAssignments
+                    .Where(sa => sa.ScoutId == scout.Id && sa.Assignment.InsigniaId == si.InsigniaId)
+                    .Select(sa => new GetScoutAssignmentDto
+                    {
+                        Id = sa.AssignmentId,
+                        Name = sa.Assignment.Name,
+                        DateCompleted = sa.DateCompleted,
+                        LeaderSignature = sa.LeaderSignature
+                    }).ToList(),
+                    PendingAssignments = applicationDbContext.Assignments
+                    .Where(a => a.InsigniaId == si.InsigniaId && !applicationDbContext.ScoutAssignments
+                        .Any(sa => sa.ScoutId == scout.Id && sa.AssignmentId == a.Id))
+                    .Select(a => new GetScoutAssignmentDto
+                    {
+                        Id = a.Id,
+                        Name = a.Name
+                    }).ToList()
+                }).ToList();
+
+            var inProgressInsignias = applicationDbContext.Insignias
+                .Where(insignia => !applicationDbContext.ScoutInsignias
+                    .Any(si => si.ScoutId == scout.Id && si.InsigniaId == insignia.Id))
+                .Select(insignia => new GetScoutInsigniaDto
+                {
+                    Id = insignia.Id,
+                    Name = insignia.Name,
+                    ImageUrl = insignia.ImageUrl,
+                    RequiredAssignments = insignia.RequiredAssignments,
+                    CompletedAssignments = applicationDbContext.ScoutAssignments
+                        .Where(sa => sa.ScoutId == scout.Id && sa.Assignment.InsigniaId == insignia.Id)
+                        .Select(sa => new GetScoutAssignmentDto
+                        {
+                            Id = sa.AssignmentId,
+                            Name = sa.Assignment.Name,
+                            DateCompleted = sa.DateCompleted,
+                            LeaderSignature = sa.LeaderSignature
+                        }).ToList(),
+                    PendingAssignments = applicationDbContext.Assignments
+                        .Where(a => a.InsigniaId == insignia.Id && !applicationDbContext.ScoutAssignments
+                            .Any(sa => sa.ScoutId == scout.Id && sa.AssignmentId == a.Id))
+                        .Select(a => new GetScoutAssignmentDto
+                        {
+                            Id = a.Id,
+                            Name = a.Name
+                        }).ToList()
+                }).ToList();
+
+
+            return new GetScoutDto
+            {
+                Id = scout.Id,
+                Name = scout.Name,
+                Tenure = scout.Tennure,
+                ScoutGroupId = scout.ScoutGroupId.ToString(),
+                ScoutGroupName = scout.ScoutGroup != null ? scout.ScoutGroup.Name : "Unknown Group",
+                CompletedInsignias = completedInsignias,
+                InProgressInsignias = inProgressInsignias
+            };
+        }
 
         [HttpGet]
         public IActionResult GetAllScouts()
         {
             var scouts = applicationDbContext.Scouts
                 .Include(s => s.ScoutGroup)
-                .Select(GetScoutDto);
+                .ToList();
 
-            return Ok(scouts);
+            return Ok(scouts.Select(GetScoutDto));
         }
 
         [HttpGet("{id:guid}")]
@@ -115,141 +178,69 @@ namespace InsigniApi.Controllers
             return NoContent();
         }
 
-        // Todo: Make Leader Signature and Timestamp show up in GetDto
-
         [HttpPost("assignment")]
-        public IActionResult AddAssignmentToScout(AddAssignmentToScoutDto dto)
+        public IActionResult AddScoutAssignment(AddAssignmentToScoutDto addScoutAssignmentDto)
         {
-            var scout = applicationDbContext.Scouts
-                .Include(s => s.CompletedAssignments)
-                .FirstOrDefault(s => s.Id == dto.ScoutId);
+            var scout = applicationDbContext.Scouts.Find(addScoutAssignmentDto.ScoutId);
             if (scout is null)
             {
-                return NotFound("Scout not found");
+                return NotFound("Scout not found.");
             }
-            var assignment = applicationDbContext.Assignments.Find(dto.AssignmentId);
-            if (assignment is null)
-            {
-                return NotFound("Assignment not found");
-            }
-            if (scout.CompletedAssignments.Any(a => a.Id == dto.AssignmentId))
-            {
-                return BadRequest("Assignment already completed by this scout.");
-            }
-
-            // Use Entity Framework's entry and property methods to set the join table properties
-            scout.CompletedAssignments.Add(assignment);
-            
-            // Get the entry for the relationship
-            var joinEntry = applicationDbContext.Entry(scout)
-                .Collection(s => s.CompletedAssignments)
-                .FindEntry(assignment);
-            
-            if (joinEntry != null)
-            {
-                // Set the join table properties
-                joinEntry.Property("LeaderSignature").CurrentValue = dto.LeaderSignature;
-                joinEntry.Property("CompletedDate").CurrentValue = DateTime.UtcNow;
-            }
-
-            var insignia = applicationDbContext.Insignias
-                .Include(i => i.Assignments)
-                .FirstOrDefault(i => i.Assignments.Any(a => a.Id == dto.AssignmentId));
-            if (insignia != null)
-            {
-                // Check the pre-requisite assignments for the insignia
-                var requiredAssignmentsCount = insignia.RequiredAssignments;
-
-                //If all assignments need to be completed.
-                if (requiredAssignmentsCount == 0)
-                {
-                    List<Assignment> requiredAssignments = insignia.Assignments;
-                    var allAssignmentsCompleted = requiredAssignments.All(a => scout.CompletedAssignments.Any(ca => ca.Id == a.Id));
-                    if (allAssignmentsCompleted)
-                    {
-                        scout.CompletedInsignias.Add(insignia);
-                    }
-                }
-                else
-                {
-                    //Grant insignia if the required number of assignments are completed.
-                    var completedAssignmentsCount = scout.CompletedAssignments.Count(a => insignia.Assignments.Any(ia => ia.Id == a.Id));
-                    if (completedAssignmentsCount >= requiredAssignmentsCount)
-                    {
-                        scout.CompletedInsignias.Add(insignia);
-                    }
-                }
-            }
-            applicationDbContext.SaveChanges();
-            return NoContent();
-        }
-
-        [HttpDelete("assignment")]
-        public IActionResult RemoveAssignmentFromScout(RemoveAssignmentFromScoutDto dto)
-        {
-            var scout = applicationDbContext.Scouts
-                .Include(s => s.CompletedAssignments)
-                .FirstOrDefault(s => s.Id == dto.ScoutId);
-
-            if (scout is null)
-            {
-                return NotFound("Scout not found");
-            }
-
             var assignment = applicationDbContext.Assignments
-                .Include(a => a.ScoutsWithAssignment)
-                .FirstOrDefault(a => a.Id == dto.AssignmentId);
+                .Find(addScoutAssignmentDto.AssignmentId);
             if (assignment is null)
             {
-                return NotFound("Assignment not found");
+                return NotFound("Assignment not found.");
             }
-
-            if (!scout.CompletedAssignments.Any(a => a.Id == dto.AssignmentId))
-            {
-                return BadRequest("Assignment not completed by this scout.");
-            }
-
-            // Remove the assignment from the scout
-            scout.CompletedAssignments.Remove(assignment);
-
-            // Remove the scout from the assignment
-            assignment.ScoutsWithAssignment.Remove(scout);
-
-            // Check if the scout had completed the insignia
             var insignia = applicationDbContext.Insignias
-                .Include(i => i.Assignments)
-                .FirstOrDefault(i => i.ScoutsWithInsignia.Any(s => s.Id == scout.Id));
+                .Find(assignment.InsigniaId);
+
+            var scoutAssignment = new ScoutAssignment
+            {
+                ScoutId = addScoutAssignmentDto.ScoutId,
+                AssignmentId = addScoutAssignmentDto.AssignmentId,
+                LeaderSignature = addScoutAssignmentDto.LeaderSignature,
+                DateCompleted = DateTime.UtcNow
+            };
+            applicationDbContext.ScoutAssignments.Add(scoutAssignment);
+
             if (insignia != null)
             {
-                // Check if the scout still has all the required assignments for the insignia
-                var requiredAssignmentsCount = insignia.RequiredAssignments;
-                if (requiredAssignmentsCount == 0)
+                // If Required assignments is 0, then all assignments are needed to be completed
+                if (insignia.RequiredAssignments == 0)
                 {
-                    //List<Assignment> requiredAssignments = insignia.Assignments;
-                    //var allAssignmentsCompleted = requiredAssignments.All(a => scout.CompletedAssignments.Any(ca => ca.Id == a.Id));
-                    //if (!allAssignmentsCompleted)
-                    //{
-                    //    scout.CompletedInsignias.Remove(insignia);
-                    //}
+                    var hasCompletedAllAssignments = applicationDbContext.ScoutAssignments
+                        .Count(sa => sa.ScoutId == scout.Id && sa.Assignment.InsigniaId == insignia.Id) >=
+                        applicationDbContext.Assignments.Count(a => a.InsigniaId == insignia.Id);
 
-                    //Since all the assignments need to be completed and one assignment is removed, remove the insignia.
-                    scout.CompletedInsignias.Remove(insignia);
-                    insignia.ScoutsWithInsignia.Remove(scout);
+                    if (hasCompletedAllAssignments)
+                    {
+                        var scoutInsignia = new ScoutInsignia
+                        {
+                            ScoutId = scout.Id,
+                            InsigniaId = insignia.Id
+                        };
+                        applicationDbContext.ScoutInsignias.Add(scoutInsignia);
+                    }
                 }
                 else
                 {
-                    // Check if the scout still has enough assignments completed for the insignia
-                    var completedAssignmentsCount = scout.CompletedAssignments.Count(a => insignia.Assignments.Any(ia => ia.Id == a.Id));
-                    if (completedAssignmentsCount < requiredAssignmentsCount)
+                    // If Required assignments is not 0, then only the required number of assignments are needed to be completed
+                    var completedAssignments = applicationDbContext.ScoutAssignments
+                        .Count(sa => sa.ScoutId == scout.Id && sa.Assignment.InsigniaId == insignia.Id);
+                    if (completedAssignments >= insignia.RequiredAssignments)
                     {
-                        scout.CompletedInsignias.Remove(insignia);
-                        insignia.ScoutsWithInsignia.Remove(scout);
+                        var scoutInsignia = new ScoutInsignia
+                        {
+                            ScoutId = scout.Id,
+                            InsigniaId = insignia.Id
+                        };
+                        applicationDbContext.ScoutInsignias.Add(scoutInsignia);
                     }
                 }
             }
-
             applicationDbContext.SaveChanges();
-            return NoContent();
+            return CreatedAtAction(nameof(GetScoutById), new { id = scout.Id }, GetScoutDto(scout));
         }
     }
 }

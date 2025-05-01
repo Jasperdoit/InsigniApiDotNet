@@ -23,7 +23,6 @@ namespace InsigniApi.Controllers
         {
             Id = insignia.Id,
             Name = insignia.Name,
-            Description = insignia.Description,
             ImageUrl = insignia.ImageUrl,
             Assignments = insignia.Assignments.Select(a => new GetAssignmentDto
             {
@@ -63,7 +62,6 @@ namespace InsigniApi.Controllers
             var insignia = new Insignia
             {
                 Name = addInsigniaDto.Name,
-                Description = addInsigniaDto.Description,
                 ImageUrl = addInsigniaDto.ImageUrl,
                 RequiredAssignments = 0,
             };
@@ -81,7 +79,6 @@ namespace InsigniApi.Controllers
                 return NotFound();
             }
             insignia.Name = updateInsigniaDto.Name;
-            insignia.Description = updateInsigniaDto.Description;
             insignia.ImageUrl = updateInsigniaDto.ImageUrl;
             insignia.RequiredAssignments = updateInsigniaDto.RequiredAssignments;
             applicationDbContext.SaveChanges();

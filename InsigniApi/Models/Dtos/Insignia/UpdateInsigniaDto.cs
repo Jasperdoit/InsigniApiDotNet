@@ -3,7 +3,6 @@
     public class UpdateInsigniaDto
     {
         public required String Name { get; set; }
-        public required String Description { get; set; }
         public required String ImageUrl { get; set; }
         public int RequiredAssignments { get; set; }
     }

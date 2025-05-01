@@ -7,6 +7,6 @@
         public required String Description { get; set; }
         public Guid InsigniaId { get; set; }
         public Insignia? Insignia { get; set; }
-        public List<Scout> ScoutsWithAssignment { get; set; } = new List<Scout>();
+        public List<ScoutAssignment> ScoutsWithAssignment { get; set; } = new List<ScoutAssignment>();
     }
 }
