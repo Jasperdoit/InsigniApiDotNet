@@ -64,7 +64,8 @@ namespace InsigniApi.Controllers
             {
                 Id = Guid.NewGuid(),
                 Name = addAssignmentDto.Name,
-                Description = addAssignmentDto.Description
+                Description = addAssignmentDto.Description,
+                InsigniaId = addAssignmentDto.InsigniaId
             };
             applicationDbContext.Assignments.Add(assignment);
             applicationDbContext.SaveChanges();
@@ -83,7 +84,7 @@ namespace InsigniApi.Controllers
             var existingAssignment = applicationDbContext.Assignments
                 .FirstOrDefault(a => a.Name == updateAssignmentDto.Name && a.InsigniaId == updateAssignmentDto.InsigniaId);
 
-            if (existingAssignment != null)
+            if (existingAssignment != null && existingAssignment.Id != id)
             {
                 return BadRequest("Assignment already exists for this insignia.");
             }
@@ -95,6 +96,7 @@ namespace InsigniApi.Controllers
             }
             assignment.Name = updateAssignmentDto.Name;
             assignment.Description = updateAssignmentDto.Description;
+            assignment.InsigniaId = updateAssignmentDto.InsigniaId;
             applicationDbContext.SaveChanges();
             return NoContent();
         }

@@ -21,6 +21,9 @@ namespace InsigniApi.Controllers
 
         private GetScoutDto GetScoutDto(Scout scout)
         {
+            // TODO: Add Description to AssignmentDto (It is missing)
+            // TODO: Rewrite this to be done without linq, this is too hard to read and to manage and it doens't work right now :(
+            // TODO: Make it so that if there is no progress on an assignment it doesn't show up in the list.
             var completedInsignias = applicationDbContext.ScoutInsignias
                 .Include(si => si.Insignia)
                 .Where(si => si.ScoutId == scout.Id)
