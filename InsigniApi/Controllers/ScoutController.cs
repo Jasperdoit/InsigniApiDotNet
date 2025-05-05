@@ -33,7 +33,7 @@ namespace InsigniApi.Controllers
                     .Where(si => si.ScoutId == scout.Id)
                     .Select(si => si.Insignia)
                     .ToList();
-
+            // Populate completed insignias
             foreach (Insignia insignia in insignias)
             {
                 List<Assignment> assignmentsScoutHasCompletedForInsignia = applicationDbContext.ScoutAssignments
@@ -96,69 +96,60 @@ namespace InsigniApi.Controllers
                         PendingAssignments = pendingAssignments
                     });
             }
-            
-            
-            //TODO: Now do the same for inProgressInsignias xD
-            
+
+            // Populate in progress insignias
+            // This is an insignia that has atleast one assignment completed, but not the required amount of assignments.
 
             List<GetScoutInsigniaDto> inProgressInsignias = new();
-            
-            // var completedInsignias = applicationDbContext.ScoutInsignias
-            //     .Include(si => si.Insignia)
-            //     .Where(si => si.ScoutId == scout.Id)
-            //     .Select(si => new GetScoutInsigniaDto
-            //     {
-            //         Id = si.InsigniaId,
-            //         Name = si.Insignia.Name,
-            //         ImageUrl = si.Insignia.ImageUrl,
-            //         RequiredAssignments = si.Insignia.RequiredAssignments,
-            //         CompletedAssignments = applicationDbContext.ScoutAssignments
-            //         .Where(sa => sa.ScoutId == scout.Id && sa.Assignment.InsigniaId == si.InsigniaId)
-            //         .Select(sa => new GetScoutAssignmentDto
-            //         {
-            //             Id = sa.AssignmentId,
-            //             Name = sa.Assignment.Name,
-            //             DateCompleted = sa.DateCompleted,
-            //             LeaderSignature = sa.LeaderSignature
-            //         }).ToList(),
-            //         PendingAssignments = applicationDbContext.Assignments
-            //         .Where(a => a.InsigniaId == si.InsigniaId && !applicationDbContext.ScoutAssignments
-            //             .Any(sa => sa.ScoutId == scout.Id && sa.AssignmentId == a.Id))
-            //         .Select(a => new GetScoutAssignmentDto
-            //         {
-            //             Id = a.Id,
-            //             Name = a.Name
-            //         }).ToList()
-            //     }).ToList();
 
-            // var inProgressInsignias = applicationDbContext.Insignias
-            //     .Where(insignia => !applicationDbContext.ScoutInsignias
-            //         .Any(si => si.ScoutId == scout.Id && si.InsigniaId == insignia.Id))
-            //     .Select(insignia => new GetScoutInsigniaDto
-            //     {
-            //         Id = insignia.Id,
-            //         Name = insignia.Name,
-            //         ImageUrl = insignia.ImageUrl,
-            //         RequiredAssignments = insignia.RequiredAssignments,
-            //         CompletedAssignments = applicationDbContext.ScoutAssignments
-            //             .Where(sa => sa.ScoutId == scout.Id && sa.Assignment.InsigniaId == insignia.Id)
-            //             .Select(sa => new GetScoutAssignmentDto
-            //             {
-            //                 Id = sa.AssignmentId,
-            //                 Name = sa.Assignment.Name,
-            //                 DateCompleted = sa.DateCompleted,
-            //                 LeaderSignature = sa.LeaderSignature
-            //             }).ToList(),
-            //         PendingAssignments = applicationDbContext.Assignments
-            //             .Where(a => a.InsigniaId == insignia.Id && !applicationDbContext.ScoutAssignments
-            //                 .Any(sa => sa.ScoutId == scout.Id && sa.AssignmentId == a.Id))
-            //             .Select(a => new GetScoutAssignmentDto
-            //             {
-            //                 Id = a.Id,
-            //                 Name = a.Name
-            //             }).ToList()
-            //     }).ToList();
+            List<Insignia> insigniasInProgress =
+                applicationDbContext.Insignias
+                    .Include(i => i.Assignments)
+                    .Where(i => !applicationDbContext.ScoutInsignias
+                        .Any(si => si.ScoutId == scout.Id && si.InsigniaId == i.Id))
+                    .ToList();
 
+            foreach (Insignia insignia in insigniasInProgress)
+            {
+                List<ScoutAssignment> scoutAssignments = applicationDbContext.ScoutAssignments
+                    .Include(sa => sa.Assignment)
+                    .Where(sa => sa.ScoutId == scout.Id && sa.Assignment.InsigniaId == insignia.Id)
+                    .ToList();
+
+                if (scoutAssignments.Count == 0)
+                    continue;
+
+                List<GetScoutAssignmentDto> completedAssignmentDtos = scoutAssignments.Select(sa => new GetScoutAssignmentDto
+                {
+                    Name = sa.Assignment.Name,
+                    Description = sa.Assignment.Description,
+                    Id = sa.AssignmentId,
+                    DateCompleted = sa.DateCompleted,
+                    LeaderSignature = sa.LeaderSignature
+                }).ToList();
+
+                List<GetScoutAssignmentDto> pendingAssignmentDtos = insignia.Assignments
+                    .Where(a => !completedAssignmentDtos.Any(ca => ca.Id == a.Id))
+                    .Select(a => new GetScoutAssignmentDto
+                    {
+                        Id = a.Id,
+                        Name = a.Name,
+                        Description = a.Description,
+                        DateCompleted = default(DateTime),
+                        LeaderSignature = String.Empty
+                    })
+                    .ToList();
+
+                inProgressInsignias.Add(new GetScoutInsigniaDto
+                {
+                    Id = insignia.Id,
+                    Name = insignia.Name,
+                    ImageUrl = insignia.ImageUrl,
+                    RequiredAssignments = insignia.RequiredAssignments,
+                    CompletedAssignments = completedAssignmentDtos,
+                    PendingAssignments = pendingAssignmentDtos
+                });
+            }
 
             return new GetScoutDto
             {
