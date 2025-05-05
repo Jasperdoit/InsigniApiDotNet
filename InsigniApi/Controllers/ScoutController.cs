@@ -21,10 +21,6 @@ namespace InsigniApi.Controllers
 
         private GetScoutDto GetScoutDto(Scout scout)
         {
-            // TODO: Add Description to AssignmentDto (It is missing)
-            // TODO: Rewrite this to be done without linq, this is too hard to read and to manage and it doens't work right now :(
-            // TODO: Make it so that if there is no progress on an assignment it doesn't show up in the list.
-
             List<GetScoutInsigniaDto> completedInsignias = new();
 
             List<Insignia> insignias =
@@ -190,6 +186,11 @@ namespace InsigniApi.Controllers
         public IActionResult AddScout(AddScoutDto addScoutDto)
         {
 
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
             // Check if the scout group exists
             var scoutGroup = applicationDbContext.ScoutGroups.Find(addScoutDto.ScoutGroupId);
             if (scoutGroup is null)
@@ -220,6 +221,12 @@ namespace InsigniApi.Controllers
         [HttpPut("{id:guid}")]
         public IActionResult UpdateScout(Guid id, UpdateScoutDto updateScoutDto)
         {
+
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
             var scout = applicationDbContext.Scouts.Find(id);
             if (scout is null)
             {
@@ -254,6 +261,12 @@ namespace InsigniApi.Controllers
         [HttpPost("assignment")]
         public IActionResult AddScoutAssignment(AddAssignmentToScoutDto addScoutAssignmentDto)
         {
+
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
             var scout = applicationDbContext.Scouts.Find(addScoutAssignmentDto.ScoutId);
             if (scout is null)
             {

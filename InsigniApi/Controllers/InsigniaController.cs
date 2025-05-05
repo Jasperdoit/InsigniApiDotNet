@@ -59,6 +59,12 @@ namespace InsigniApi.Controllers
         [HttpPost]
         public IActionResult AddInsignia(AddInsigniaDto addInsigniaDto)
         {
+
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
             var insignia = new Insignia
             {
                 Name = addInsigniaDto.Name,
@@ -73,6 +79,12 @@ namespace InsigniApi.Controllers
         [HttpPut("{id:guid}")]
         public IActionResult UpdateInsignia(Guid id, UpdateInsigniaDto updateInsigniaDto)
         {
+
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
             var insignia = applicationDbContext.Insignias.Find(id);
             if (insignia == null)
             {

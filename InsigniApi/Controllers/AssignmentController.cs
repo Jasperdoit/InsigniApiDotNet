@@ -46,6 +46,11 @@ namespace InsigniApi.Controllers
         [HttpPost]
         public IActionResult AddAssignment([FromBody] AddAssignmentDto addAssignmentDto)
         {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
             var Insignia = applicationDbContext.Insignias.Find(addAssignmentDto.InsigniaId);
             if (Insignia == null)
             {
@@ -75,6 +80,11 @@ namespace InsigniApi.Controllers
         [HttpPut("{id:guid}")]
         public IActionResult UpdateAssignment(Guid id, [FromBody] UpdateAssignmentDto updateAssignmentDto)
         {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
             var Insignia = applicationDbContext.Insignias.Find(updateAssignmentDto.InsigniaId);
             if (Insignia == null)
             {

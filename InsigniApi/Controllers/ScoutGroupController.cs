@@ -43,6 +43,12 @@ namespace InsigniApi.Controllers
         [HttpPost]
         public IActionResult AddScoutGroup(AddScoutGroupDto addScoutGroupDto)
         {
+
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
             var scoutGroup = new ScoutGroup
             {
                 Id = Guid.NewGuid(),
@@ -56,6 +62,12 @@ namespace InsigniApi.Controllers
         [HttpPut("{id:guid}")]
         public IActionResult UpdateScoutGroup(Guid id, UpdateScoutGroupDto updateScoutGroupDto)
         {
+
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
             var scoutGroup = dbContext.ScoutGroups.Find(id);
             if (scoutGroup is null)
             {
